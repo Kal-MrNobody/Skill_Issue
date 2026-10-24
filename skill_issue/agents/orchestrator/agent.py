@@ -6,9 +6,10 @@ import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable
 
-from uagents import Context
+from uagents import Agent, Context
 
 from agents.common import emit
+from agents.orchestrator.chat import ChatLayer
 from agents.runtime import local_agent
 from contracts.messages import (
     MESSAGES,
@@ -21,6 +22,7 @@ from contracts.messages import (
     ReportResult,
     ScanResult,
 )
+from core.chat import ChatRouter
 from core.flow import Effect, Flow, FlowConfig, Ignored, Notify, Send
 from core.jobs import InMemoryJobStore, Job, JobStore
 
@@ -37,8 +39,11 @@ class OrchestratorApp:
         store: JobStore | None = None,
         on_notify: NotifyHook | None = None,
         clock: Callable[[], float] = time.monotonic,
+        router: ChatRouter | None = None,
+        publish_manifest: bool = False,
+        agent: Agent | None = None,
     ) -> None:
-        self.agent = local_agent("orchestrator", seed)
+        self.agent = agent or local_agent("orchestrator", seed)
         self.flow = Flow(cfg or FlowConfig())
         self.store = store or InMemoryJobStore()
         self.workers: dict[str, str] = {}  # role -> address
@@ -51,12 +56,16 @@ class OrchestratorApp:
         for model in (*RESULT_MODELS, Failure):
             self.agent.on_message(model=model)(self._on_worker_message)
         self.agent.on_interval(period=tick)(self._on_tick)
+        self.chat = None
+        if router is not None:  # only the orchestrator speaks the Agent Chat Protocol
+            self.chat = ChatLayer(self, router, clock)
+            self.agent.include(self.chat.protocol, publish_manifest=publish_manifest)
 
     def set_workers(self, workers: dict[str, str]) -> None:
         self.workers = dict(workers)
         self._roles = {addr: role for role, addr in workers.items()}
 
-    # --- job entry (step 4 replaces this with chat) -----------------------
+    # --- job entry (chat, or direct for local runs) ------------------------
 
     def submit(self, repo_url: str, owner: str = "", ref: str | None = None) -> str:
         job = Job(job_id=f"job-{uuid.uuid4().hex[:12]}", repo_url=repo_url, owner=owner, ref=ref)
@@ -65,6 +74,9 @@ class OrchestratorApp:
         self._new.append(job.job_id)
         emit("orchestrator", "received", job.job_id, repo_url=repo_url)
         return job.job_id
+
+    def jobs_of(self, owner: str) -> list[Job]:
+        return self.store.of_owner(owner)
 
     async def wait(self, job_id: str, timeout: float) -> Job:
         await asyncio.wait_for(self._finished[job_id].wait(), timeout)
@@ -122,6 +134,8 @@ class OrchestratorApp:
                 if job.failure:
                     fields |= {"step": str(job.failure.step), "error_code": str(job.failure.code)}
                 emit("orchestrator", effect.kind, job.job_id, **fields)
+                if self.chat:
+                    await self.chat.notify(ctx, job, effect.kind)
                 if self._on_notify:
                     await self._on_notify(ctx, job, effect.kind)
                 if effect.kind in ("done", "failed"):

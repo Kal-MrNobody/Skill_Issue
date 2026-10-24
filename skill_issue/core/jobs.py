@@ -42,6 +42,7 @@ class JobStore(Protocol):
     def get(self, job_id: str) -> Job | None: ...
     def put(self, job: Job) -> None: ...
     def active(self) -> list[Job]: ...
+    def of_owner(self, owner: str) -> list[Job]: ...
 
 
 class InMemoryJobStore:
@@ -56,6 +57,9 @@ class InMemoryJobStore:
 
     def active(self) -> list[Job]:
         return [j for j in self._jobs.values() if not j.terminal]
+
+    def of_owner(self, owner: str) -> list[Job]:
+        return [j for j in self._jobs.values() if j.owner == owner]
 
 
 def idempotency_key(job_id: str, step: JobState, attempt: int) -> str:

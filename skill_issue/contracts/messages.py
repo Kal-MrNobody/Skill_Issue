@@ -20,8 +20,7 @@ from contracts.enums import (
     Severity,
     TrustVerdict,
 )
-
-SCHEMA_VERSION = 1
+from contracts.version import SCHEMA_VERSION  # noqa: F401  (re-exported)
 
 SHA_RE = r"^[0-9a-f]{40}$"
 SHORT = 500  # cap for any free-text summary field
@@ -191,3 +190,21 @@ class Failure(InternalMessage):
     detail: str = Field(..., max_length=SHORT)
     retryable: bool = False
     provenance: Provenance | None = None  # absent when no commit was pinned yet
+
+
+MESSAGES: dict[str, type[InternalMessage]] = {
+    cls.__name__: cls
+    for cls in (
+        IntakeRequest,
+        IntakeResult,
+        ScanRequest,
+        ScanResult,
+        BenchRequest,
+        BenchAccepted,
+        Heartbeat,
+        BenchResult,
+        ReportRequest,
+        ReportResult,
+        Failure,
+    )
+}

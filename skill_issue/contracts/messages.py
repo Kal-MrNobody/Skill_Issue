@@ -96,8 +96,9 @@ class Finding(Model):
     severity: Severity
     rule_id: str
     message: str = Field(..., max_length=SHORT)
-    file: str
-    line: int | None = None
+    file: str  # repo-relative
+    line: int | None = None  # 1 for file-level findings
+    source: str = "skill-scanner"
 
 
 class ScanResult(InternalMessage):
@@ -105,8 +106,10 @@ class ScanResult(InternalMessage):
     commit_sha: str = Field(..., regex=SHA_RE)
     skill_path: str
     findings: list[Finding]
+    domains: list[str] = Field(default_factory=list)  # informational inventory
     undeclared_domains: list[str] = Field(default_factory=list)
     gate: GateDecision
+    scan_error: ErrorCode | None = None  # SCAN_FAILED: scanner crashed/timed out, gate fails safe
     provenance: Provenance
 
 

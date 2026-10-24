@@ -60,12 +60,13 @@ class Severity(StrEnum):
 
 
 class Bucket(StrEnum):
-    """The four buckets security findings are sorted into."""
+    """The four buckets security findings are sorted into, plus OTHER (docs/PLAN.md step 3)."""
 
     PROMPT_INJECTION = "PROMPT_INJECTION"
-    DANGEROUS_EXECUTION = "DANGEROUS_EXECUTION"
-    NETWORK_EGRESS = "NETWORK_EGRESS"
-    DATA_ACCESS = "DATA_ACCESS"
+    DANGEROUS_COMMAND = "DANGEROUS_COMMAND"
+    NETWORK = "NETWORK"
+    INSTALL_PERSISTENCE = "INSTALL_PERSISTENCE"
+    OTHER = "OTHER"
 
 
 class GateDecision(StrEnum):

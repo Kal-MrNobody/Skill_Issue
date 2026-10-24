@@ -60,9 +60,11 @@ class Claim(Model):
 
 
 class SkillCandidate(Model):
+    skill_id: str  # stable per SKILL.md path; used in card selections
     path: str
     name: str
     description: str = Field(..., max_length=SHORT * 2)
+    files: list[str] = Field(default_factory=list, max_items=200)  # paths only, never contents
     claims: list[Claim] = Field(default_factory=list)
 
 
@@ -75,6 +77,7 @@ class IntakeResult(InternalMessage):
     repo_url: str
     commit_sha: str = Field(..., regex=SHA_RE)
     candidates: list[SkillCandidate]
+    claims: list[Claim] = Field(default_factory=list)  # every claim found, repo-wide
     warnings: list[str] = Field(default_factory=list)
     provenance: Provenance
 

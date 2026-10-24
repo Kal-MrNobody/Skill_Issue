@@ -114,6 +114,7 @@ SAMPLES: list[Model] = [
     _prov(),
     m.Claim(text="2x faster reviews", file="README.md", line=3),
     m.SkillCandidate(
+        skill_id="skl_0a1b2c3d",
         path="skills/a/SKILL.md",
         name="a",
         description="does a",
@@ -124,7 +125,8 @@ SAMPLES: list[Model] = [
         **ENV,
         repo_url=REPO,
         commit_sha=SHA,
-        candidates=[m.SkillCandidate(path="SKILL.md", name="x", description="y")],
+        candidates=[m.SkillCandidate(skill_id="skl_1", path="SKILL.md", name="x", description="y")],
+        claims=[m.Claim(text="2x faster reviews", file="README.md", line=3)],
         warnings=["refused symlink: hostname"],
         provenance=_prov(),
     ),

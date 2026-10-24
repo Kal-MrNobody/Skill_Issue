@@ -1,0 +1,40 @@
+[project]
+name = "skillaudit"
+version = "0.1.0"
+description = "Checks an AI agent skill for trust and lift before install. Five Fetch.ai uAgents."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "uagents==0.26.1",
+    "uagents-core==0.4.11",
+    "httpx==0.28.1",
+    "pydantic==2.13.5",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.10",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+norecursedirs = ["fixtures"]
+addopts = "-m 'not integration and not live'"
+markers = [
+    "integration: multi-agent tests in one process (uv run pytest -q -m integration)",
+    "live: real network or model calls that cost money (only on request)",
+]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

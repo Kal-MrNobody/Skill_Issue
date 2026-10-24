@@ -269,7 +269,7 @@ def _picker(job: Job) -> Reply:
     text = (
         f"I found {len(cands)} skills in {_repo(job)}. Which one should I audit?\n"
         + "\n".join(lines)
-        + "\nPick one on the card, or reply with its id."
+        + "\nPick one on the card, or reply with its name."
     )
     return Reply(text, "carousel", _fit(build, min(len(cands), 30)))
 
@@ -409,10 +409,14 @@ def _report_text(job: Job) -> str:
     )
 
 
+EXAMPLE_REPO = "https://github.com/anthropics/skills"
 FAILURE_HINTS = {
-    ErrorCode.BAD_URL: "Send a GitHub repo link like https://github.com/owner/repo",
-    ErrorCode.REPO_NOT_FOUND: "Check the link; only public GitHub repositories are supported.",
-    ErrorCode.PRIVATE_REPO: "Only public GitHub repositories are supported.",
+    ErrorCode.BAD_URL: f"Send a GitHub repository link, for example {EXAMPLE_REPO}",
+    ErrorCode.REPO_NOT_FOUND: (
+        "It doesn't exist on GitHub or it is private, and I can only audit public "
+        f"repositories. Send a public repository link, for example {EXAMPLE_REPO}"
+    ),
+    ErrorCode.PRIVATE_REPO: "GitHub refused access. I can only audit public repositories.",
     ErrorCode.NO_SKILL: "A skill repository needs at least one SKILL.md file.",
     ErrorCode.TOO_LARGE: "The repository is over the size limit for an audit.",
     ErrorCode.UNSAFE_ARCHIVE: "The repository archive contained unsafe paths, so I stopped.",
@@ -420,6 +424,8 @@ FAILURE_HINTS = {
     ErrorCode.TIMEOUT: "One of my steps took too long. Please try again.",
     ErrorCode.BUDGET_EXHAUSTED: "Today's benchmark budget is used up. Please try tomorrow.",
 }
+# the hint says it all; the worker's detail would only repeat it
+HINT_ONLY = {ErrorCode.BAD_URL, ErrorCode.REPO_NOT_FOUND, ErrorCode.PRIVATE_REPO}
 
 
 def _failure(job: Job) -> Reply:
@@ -427,5 +433,5 @@ def _failure(job: Job) -> Reply:
     if f is None:
         return Reply("Sorry, something went wrong with this audit. Please try again.")
     hint = FAILURE_HINTS.get(f.code, "Please try again later.")
-    detail = f" {f.detail}" if f.detail else ""
-    return Reply(f"Sorry, I couldn't finish the audit of {job.repo_url} ({f.code}).{detail} {hint}")
+    detail = "" if f.code in HINT_ONLY or not f.detail else f" {f.detail.rstrip('.')}."
+    return Reply(f"I couldn't audit {job.repo_url}, so nothing was scanned.{detail} {hint}")

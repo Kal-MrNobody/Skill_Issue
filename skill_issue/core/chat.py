@@ -23,7 +23,7 @@ RETRY_TEXT = (
     "or reply with the skill id (or 'run benchmark')."
 )
 STALE_TEXT = "That card is no longer active. Send the repository link again to start a new audit."
-COOLDOWN_TEXT = "I just started an audit for you. Please wait a few seconds before the next one."
+COOLDOWN_TEXT = "I just started an audit for you. Send the next link in a few seconds."
 TOO_MANY_TEXT = "You already have several audits running. I'll take a new one when one finishes."
 
 
@@ -53,7 +53,12 @@ Action = Drop | Say | StartJob | Select
 
 
 def _view(job: Job) -> JobView:
-    return JobView(job.job_id, job.state, tuple(c["skill_id"] for c in job.candidates))
+    return JobView(
+        job.job_id,
+        job.state,
+        tuple(c["skill_id"] for c in job.candidates),
+        tuple(c.get("name") or "" for c in job.candidates),
+    )
 
 
 def _is_json(text: str) -> bool:

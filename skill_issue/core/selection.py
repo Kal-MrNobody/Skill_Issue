@@ -18,6 +18,7 @@ class JobView:
     job_id: str
     state: JobState
     skill_ids: tuple[str, ...]
+    skill_names: tuple[str, ...] = ()  # same order as skill_ids
 
 
 @dataclass(frozen=True)
@@ -43,17 +44,37 @@ def parse_selection(text: str, waiting: Sequence[JobView]) -> Selection | None:
     return _from_prose(t, waiting)
 
 
+def _mentions(text: str, word: str) -> bool:
+    return (
+        bool(word) and re.search(rf"(?<![\w-]){re.escape(word)}(?![\w-])", text, re.I) is not None
+    )
+
+
+def _picked(job: JobView, t: str) -> str | None:
+    """The one skill of this job named in the text (by id or name), else None."""
+    names = job.skill_names or ("",) * len(job.skill_ids)
+    hits = {sid for sid, name in zip(job.skill_ids, names, strict=True) if _mentions(t, sid)}
+    hits |= {sid for sid, name in zip(job.skill_ids, names, strict=True) if _mentions(t, name)}
+    return hits.pop() if len(hits) == 1 else None
+
+
 def _from_prose(t: str, waiting: Sequence[JobView]) -> Selection | None:
     mentioned = [j for j in waiting if j.job_id in t]
-    if len(mentioned) == 1:
-        job = mentioned[0]
-    elif not mentioned and len(waiting) == 1:
-        job = waiting[0]  # the planner may leave out the id when only one job is waiting
-    else:
+    if len(mentioned) > 1:
         return None
+    if not mentioned:
+        # no job id (typed by a person, or left out by the planner): the newest waiting job
+        # whose skill the text names; else the only waiting job
+        for job in reversed(waiting):
+            if job.state is JobState.AWAITING_SKILL_PICK and (skill := _picked(job, t)):
+                return Selection(job.job_id, "pick_skill", skill)
+        if len(waiting) != 1:
+            return None
+        mentioned = list(waiting)
+    job = mentioned[0]
     if job.state is JobState.AWAITING_SKILL_PICK:
-        ids = [s for s in job.skill_ids if re.search(rf"(?<![\w-]){re.escape(s)}(?![\w-])", t)]
-        return Selection(job.job_id, "pick_skill", ids[0]) if len(ids) == 1 else None
+        skill = _picked(job, t)
+        return Selection(job.job_id, "pick_skill", skill) if skill else None
     if job.state is JobState.AWAITING_RUN_CLICK and RUN_WORDS.search(t):
         return Selection(job.job_id, "run_benchmark")
     return None

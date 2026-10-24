@@ -1,0 +1,28 @@
+# Render Blueprint: SkillAudit as one always-on service.
+# Secrets are entered in the Render dashboard when the Blueprint is created (sync: false);
+# they are never stored in this repo.
+services:
+  - type: web
+    name: skillaudit
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./skill_issue/Dockerfile
+    dockerContext: ./skill_issue
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ORCHESTRATOR_SEED
+        sync: false
+      - key: INTAKE_SEED
+        sync: false
+      - key: SECURITY_SEED
+        sync: false
+      - key: BENCHMARK_SEED
+        sync: false
+      - key: REPORT_SEED
+        sync: false
+      - key: AGENTVERSE_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false

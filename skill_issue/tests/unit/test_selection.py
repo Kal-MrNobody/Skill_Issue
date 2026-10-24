@@ -62,3 +62,35 @@ def test_t4_3_garbage_is_none(text):
 
 def test_prose_pick_needs_a_known_skill_id():
     assert parse_selection("The user picked skill skl_99 for job j_8f3", [PICK]) is None
+
+
+PICK_NAMED = JobView(
+    "job-old", JobState.AWAITING_SKILL_PICK, ("skl_a", "skl_b"), ("pdf", "docx-writer")
+)
+PICK_NAMED_NEW = JobView(
+    "job-new", JobState.AWAITING_SKILL_PICK, ("skl_a", "skl_b"), ("pdf", "docx-writer")
+)
+
+
+def test_prose_skill_name_picks_it():
+    assert parse_selection("audit docx-writer please", [PICK_NAMED]) == Selection(
+        "job-old", "pick_skill", "skl_b"
+    )
+
+
+def test_bare_skill_name_or_id_matches_case_insensitively():
+    assert parse_selection("PDF", [PICK_NAMED]) == Selection("job-old", "pick_skill", "skl_a")
+    assert parse_selection("skl_b", [PICK_NAMED]) == Selection("job-old", "pick_skill", "skl_b")
+
+
+def test_without_job_id_the_newest_waiting_job_with_that_skill_wins():
+    waiting = [PICK_NAMED, PICK_NAMED_NEW, RUN]
+    assert parse_selection("pdf", waiting) == Selection("job-new", "pick_skill", "skl_a")
+
+
+def test_name_inside_a_longer_word_does_not_match():
+    assert parse_selection("pdfs are great", [PICK_NAMED]) is None
+
+
+def test_two_different_skills_named_is_ambiguous():
+    assert parse_selection("pdf or docx-writer?", [PICK_NAMED]) is None

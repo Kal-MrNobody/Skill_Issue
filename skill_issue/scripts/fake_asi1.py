@@ -49,6 +49,7 @@ class Received:
     card_kind: str | None
     payload: dict | None
     terminal: bool
+    session: str = ""
 
 
 class FakeAsi1:
@@ -57,6 +58,7 @@ class FakeAsi1:
         self.tasks: set[asyncio.Task] = set()
         self.inbox: asyncio.Queue[Received] = asyncio.Queue()
         self.outbox: list[tuple[str, str]] = []
+        self.sent_sessions: list[str] = []  # session of each message we sent, in order
         self.acks = 0
         proto = Protocol(spec=chat_protocol_spec)
         proto.on_message(ChatMessage)(self._on_chat)
@@ -68,15 +70,16 @@ class FakeAsi1:
         """uagents only sends from handlers, so say() queues and this interval sends."""
         while self.outbox:
             to, text = self.outbox.pop(0)
+            self.sent_sessions.append(str(ctx.session))
             await ctx.send(to, ChatMessage(content=[TextContent(text=text)]))
 
     async def _on_chat(self, ctx: Context, sender: str, msg: ChatMessage) -> None:
         await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id))
         meta = next((c.metadata for c in msg.content if isinstance(c, MetadataContent)), {})
         payload = json.loads(meta["card_payload"]) if meta.get("card_payload") else None
-        await self.inbox.put(
-            Received(msg.text(), meta.get("card_kind"), payload, meta.get("is_terminal") == "true")
-        )
+        terminal = meta.get("is_terminal") == "true"
+        received = Received(msg.text(), meta.get("card_kind"), payload, terminal, str(ctx.session))
+        await self.inbox.put(received)
 
     async def _on_ack(self, ctx: Context, sender: str, msg: ChatAcknowledgement) -> None:
         self.acks += 1

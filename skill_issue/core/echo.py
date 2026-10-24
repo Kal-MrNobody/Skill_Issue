@@ -24,9 +24,9 @@ def emoji_count(text: str) -> int:
 class EchoGuard:
     def __init__(
         self,
-        duplicate_window: float = 120,
-        cooldown: float = 30,
-        max_active_jobs: int = 3,
+        duplicate_window: float = 20,
+        cooldown: float = 3,
+        max_active_jobs: int = 5,
         max_senders: int = 10_000,
         echo_window: float = 900,
         similarity: float = 0.85,

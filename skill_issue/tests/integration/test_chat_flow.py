@@ -99,3 +99,48 @@ async def test_selection_from_another_sender_cannot_drive_a_job(tmp_path):
         job = system.orchestrator.jobs_of(client.agent.address)[0]
     assert "no longer active" in stale.text
     assert job.state is JobState.AWAITING_SKILL_PICK
+
+
+async def test_rejected_card_is_resent_as_text(tmp_path, monkeypatch):
+    """chat.agentverse.ai answers HTTP 500 to card messages: the user must still get the text."""
+    from uagents.context import ExternalContext, InternalContext
+    from uagents_core.contrib.protocols.chat import MetadataContent
+    from uagents_core.types import DeliveryStatus, MsgStatus
+
+    def rejecting_cards(real_send):
+        async def send(self, destination, message, **kw):
+            if any(isinstance(c, MetadataContent) for c in getattr(message, "content", [])):
+                return MsgStatus(
+                    status=DeliveryStatus.FAILED,
+                    detail="Message delivery failed",
+                    destination=destination,
+                    endpoint="",
+                    session=self.session,
+                )
+            return await real_send(self, destination, message, **kw)
+
+        return send
+
+    for cls in (InternalContext, ExternalContext):  # handlers vs interval ticks
+        monkeypatch.setattr(cls, "send", rejecting_cards(cls.send))
+    system, client = _setup(tmp_path)
+    orch = system.orchestrator.agent.address
+    async with running([*system.apps, client]):
+        await client.say(orch, f"audit {F2}")
+        picker = await client.next_reply(10)
+        assert picker.card_kind is None and "Which one should I audit?" in picker.text
+        job = system.orchestrator.jobs_of(client.agent.address)[0]
+        await client.say(orch, f"let's do {job.candidates[1]['name']}")
+        nxt = await client.next_reply(10)
+    assert nxt.card_kind is None and nxt.text.startswith("Security scan for")
+
+
+async def test_later_replies_stay_in_the_users_chat_session(tmp_path):
+    """Agentverse chat rejects (HTTP 500) replies outside the conversation's session."""
+    system, client = _setup(tmp_path)
+    orch = system.orchestrator.agent.address
+    async with running([*system.apps, client]):
+        seen = await converse(client, orch, F2, "json", timeout=20, show=lambda r: None)
+    assert len(seen) == 3
+    # each reply comes after a worker hop, yet carries the session of the message it answers
+    assert [r.session for r in seen] == client.sent_sessions
